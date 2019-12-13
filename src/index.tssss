@@ -1,0 +1,74 @@
+import { Duplex } from 'stream';
+import { type } from 'os';
+declare namespace console {
+	function line(...args: any[]): void;
+	function log(...args: any[]): void;
+}
+enum PS {
+	idle,
+	tagstart,
+	tagend
+}
+export class XmlParser extends Duplex {
+	private total = 0;
+	private state = PS.idle;
+	private buf = '';
+	constructor() {
+		super({ objectMode: true });
+	}
+	_read() {}
+	_write(chunk: any, encoding: string, callback: (error?: Error | null) => void) {
+		this.total += chunk.length;
+		this.parseString(chunk);
+		//console.line('\r', this.total);
+		callback();
+	}
+	_final() {
+		console.log('parse end!!!');
+		this.push(null);
+	}
+	parseContext(data: string) {
+		//if (this.buf.length) console.log('ctx:', data);
+	}
+	parseTag(data: string) {
+		//console.log(data);
+	}
+	parseString(data: string) {
+		for (let index = 0; index < data.length; index++) {
+			const element = data[index];
+			switch (element) {
+				case '<':
+					switch (this.state) {
+						case PS.idle:
+							this.parseContext(this.buf);
+						case PS.tagend:
+							this.state = PS.tagstart;
+							this.buf = element;
+							break;
+						case PS.tagstart:
+							this.buf += element;
+							break;
+						default:
+							break;
+					}
+					break;
+				case '>':
+					switch (this.state) {
+						case PS.tagstart:
+							this.buf += element;
+							this.parseTag(this.buf);
+							this.state = PS.tagend;
+							this.buf = '';
+							break;
+						default:
+							break;
+					}
+					break;
+				default:
+					if (this.state == PS.tagend) this.state = PS.idle;
+					this.buf += element;
+					break;
+			}
+		}
+	}
+}
